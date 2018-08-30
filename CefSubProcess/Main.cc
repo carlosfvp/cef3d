@@ -19,7 +19,82 @@
 
 #include <Cef3DPCH.h>
 
-int main(int argc,char* argv[]) 
+#include <iostream>
+
+class MyV8Handler : public CefV8Handler {
+public:
+	MyV8Handler() {}
+
+	virtual bool Execute(const CefString& name,
+		CefRefPtr<CefV8Value> object,
+		const CefV8ValueList& arguments,
+		CefRefPtr<CefV8Value>& retval,
+		CefString& exception) OVERRIDE {
+		if (name == "test") {
+			// Return my string value.
+			retval = CefV8Value::CreateString("My Value!");
+			return true;
+		}
+
+		if (name == "test2") {
+			// Return my string value.
+			retval = CefV8Value::CreateString("My Value2!");
+			return true;
+		}
+
+		// Function does not exist.
+		return false;
+	}
+
+	// Provide the reference counting implementation for this class.
+	IMPLEMENT_REFCOUNTING(MyV8Handler);
+};
+
+class MyDelegate : public Cef3D::Cef3DRendererDelegate
+{
+	virtual void OnWebKitInitialized(CefRefPtr<Cef3D::Cef3DRenderer> app)
+	{
+		std::string extensionCode = Cef3D::Cef3DFileSystem::Get().ReadFile("D:/cef3d/Cef3D/Binaries/Win64/test/lib.js");
+
+		// Create an instance of my CefV8Handler object.
+		CefRefPtr<CefV8Handler> handler = new MyV8Handler();
+
+		// Register the extension.
+		CefRegisterExtension("v8/test", extensionCode, handler);
+	}
+
+	virtual bool OnProcessMessageReceived(
+		CefRefPtr<Cef3D::Cef3DRenderer> app,
+		CefRefPtr<CefBrowser> browser,
+		CefProcessId source_process,
+		CefRefPtr<CefProcessMessage> message)
+	{
+
+		return true;
+	}
+
+	virtual void OnContextCreated(CefRefPtr<Cef3D::Cef3DRenderer> app,
+		CefRefPtr<CefBrowser> browser,
+		CefRefPtr<CefFrame> frame,
+		CefRefPtr<CefV8Context> context)
+	{
+		//CefRefPtr<CefV8Handler> handler = new MyV8Handler();
+
+		// Create the "myfunc" function.
+		//CefRefPtr<CefV8Value> func = CefV8Value::CreateFunction("test", handler);
+
+		// Add the "myfunc" function to the "window" object.
+		//context->GetGlobal()->SetValue("test", func, V8_PROPERTY_ATTRIBUTE_NONE);
+
+
+		
+		
+		//frame->ExecuteJavaScript("alert('ExecuteJavaScript works!');", frame->GetURL(), 0);
+	}
+	IMPLEMENT_REFCOUNTING(MyDelegate);
+};
+
+int main(int argc,char* argv[])
 {
 #ifdef _WIN32
 	CefMainArgs main_args(GetModuleHandle(NULL));
@@ -28,5 +103,10 @@ int main(int argc,char* argv[])
 #endif
 
 	CefRefPtr<Cef3D::Cef3DRenderer> app(new Cef3D::Cef3DRenderer());
+
+	CefRefPtr<Cef3D::Cef3DRendererDelegate> del(new MyDelegate());
+
+	app->RegisterDelegate(del);
+
 	return CefExecuteProcess(main_args,app.get(),nullptr);
 }

@@ -24,6 +24,9 @@ namespace Cef3D
 		Delegates.insert(Del);
 	}
 
+	CefRefPtr<CefRenderProcessHandler> Cef3DRenderer::GetRenderProcessHandler() {
+		return this;
+	}
 
 	void Cef3DRenderer::OnRenderThreadCreated(CefRefPtr<CefListValue> extra_info) 
 	{

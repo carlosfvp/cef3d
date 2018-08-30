@@ -30,6 +30,7 @@
 #include "Cef3DTempWindow.h"
 #include "Cef3DOsrHandler.h"
 #include "Cef3DOsrWindow.h"
+#include "Cef3DV8Handler.h"
 #include "Cef3DBrowserWindowOsr.h"
 #include "Cef3DRootWindowImpl.h"
 #include "Cef3DViewsWindow.h"

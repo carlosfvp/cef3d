@@ -40,7 +40,6 @@ bool MouseTracking = false;
 
 Cef3DDirect3D11Renderer Renderer;
 
-
 class Cef3DDelegate
 {
 public:
@@ -53,6 +52,15 @@ public:
 	{
 		if (OverlayBrowser)
 		{
+			if (Renderer.GetWindow()->GetWidth() != width || Renderer.GetWindow()->GetHeight() != height)
+			{
+				// Re init Direct3D
+				if (!Renderer.Resize(width, height))
+				{
+					PostQuitMessage(0);
+				}
+			}
+
 			Renderer.UpdateOffscreenTexture(buffer, width, height);
 			Renderer.Render();
 		}
@@ -71,8 +79,8 @@ int WINAPI WinMain(_In_ HINSTANCE hInInstance, _In_opt_ HINSTANCE hPrevInstance,
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
 	{
-		int WinWidth = 1400;
-		int WinHeight = 900;
+		int WinWidth = 800;
+		int WinHeight = 600;
 
 		class RootWindowWndProc : public WndProcListener
 		{
@@ -104,7 +112,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInInstance, _In_opt_ HINSTANCE hPrevInstance,
 
 		Cef3D::Cef3DDefinition definition;
 		definition.UseChildProcess = isSubProcessed;
-		definition.OffscreenRendering = true;
+		definition.OffscreenRendering = false;
 		definition.UseCefLoop = true;
 
 		bool init = Cef3D_Init(definition);
@@ -115,7 +123,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInInstance, _In_opt_ HINSTANCE hPrevInstance,
 		scoped_ptr<Cef3DDelegate> Cef3DListener(new Cef3DDelegate);
 
 		Cef3D::Cef3DBrowserDefinition def;
-		def.DefaultUrl = "https://www.youtube.com/watch?v=7aE2ZkSNGyU";
+		def.DefaultUrl = "file:///test/index.html";
 		def.Rect = Cef3D::Cef3DRect(WinWidth, WinHeight);
 		def.ParentHandle = TopWindow;
 
@@ -124,7 +132,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInInstance, _In_opt_ HINSTANCE hPrevInstance,
 
 		Cef3D::Cef3DDelegates::OnPaint.Add(CEF3D_BIND(&Cef3DDelegate::OnPaint, Cef3DListener.get()));
 		Cef3D::Cef3DDelegates::OnAfterCreated.Add(CEF3D_BIND(&Cef3DDelegate::OnBrowserCreated, Cef3DListener.get()));
-
+		
 		Cef3D_PumpMessageLoop(true);
 		
 		Renderer.Shutdown();
@@ -292,15 +300,6 @@ LRESULT CALLBACK RootWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 			RECT clientRect;
 			::GetClientRect(hWnd, &clientRect);
 
-			int w = clientRect.right - clientRect.left;
-			int h = clientRect.bottom - clientRect.top;
-
-			// Re init Direct3D
-			if (!Renderer.Resize(w, h))
-			{
-				PostQuitMessage(0);
-				break;
-			}
 			OverlayBrowser->SendResize(Cef3D::Cef3DRect(clientRect.left,clientRect.top,clientRect.right - clientRect.left,clientRect.bottom - clientRect.top));
 		}
 		break;

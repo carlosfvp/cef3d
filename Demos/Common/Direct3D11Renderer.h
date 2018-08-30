@@ -52,6 +52,7 @@ public:
 
 
 	void SetVsync(bool vsync) { Vsync = vsync; }
+	Cef3DSampleWindow* GetWindow() { return Window; }
 
 private:
 	bool CompileFsTriangleVertexShader(unsigned flags);

@@ -184,8 +184,7 @@ bool Cef3DDirect3D11Renderer::InitResources()
 	InitData.SysMemSlicePitch = 0;
 
 	// Create the buffer.
-	hr = Device->CreateBuffer(&cbDesc, &InitData,
-		&VSConstantBuffer);
+	hr = Device->CreateBuffer(&cbDesc, &InitData, &VSConstantBuffer);
 
 	if (FAILED(hr))
 		return false;
@@ -236,6 +235,31 @@ bool Cef3DDirect3D11Renderer::InitResources()
 			return false;
 	}
 
+	UINT stride = sizeof(SimpleVertex);
+	UINT offset = 0;
+
+	float clearColor[4] = { 0,0,0,0 };
+
+	DeviceContext->ClearRenderTargetView(Backbuffer, clearColor);
+
+	DeviceContext->OMSetRenderTargets(1, &Backbuffer, NULL);
+	DeviceContext->RSSetViewports(1, &Viewport);
+
+	DeviceContext->IASetInputLayout(FSTriangleIL);
+
+	DeviceContext->IASetVertexBuffers(0, 1, &VertexBuffer, &stride, &offset);
+	DeviceContext->VSSetConstantBuffers(0, 1, &VSConstantBuffer);
+
+	DeviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	DeviceContext->VSSetShader(FSTriangleVS, 0, 0);
+	DeviceContext->PSSetShader(FSTrianglePS, 0, 0);
+
+	// Bind offscreen texture
+	DeviceContext->PSSetShaderResources(0, 1, &OffscreenTexSRV);
+	// Bind the sampler
+	DeviceContext->PSSetSamplers(0, 1, &OffscreenPSSampler);
+
 	return true;
 }
 
@@ -246,34 +270,38 @@ void Cef3DDirect3D11Renderer::Render()
 		Only thing that is constantly changing in our examples are the offscreen texture so everything else could be not called at all throughout the application.
 	*/
 	// Clear
-	float clearColor[4] = { 0,0,0,0 };
-	DeviceContext->ClearRenderTargetView(Backbuffer, clearColor);
+	//float clearColor[4] = { 0,0,0,0 };
 
-	UINT stride = sizeof(SimpleVertex);
-	UINT offset = 0;
+	//if (!DeviceContext)
+	//	return;
+
+	//DeviceContext->ClearRenderTargetView(Backbuffer, clearColor);
+
+	//UINT stride = sizeof(SimpleVertex);
+	//UINT offset = 0;
 
 	// Set render target and viewport
-	DeviceContext->OMSetRenderTargets(1, &Backbuffer, NULL);
-	DeviceContext->RSSetViewports(1, &Viewport);
+	//DeviceContext->OMSetRenderTargets(1, &Backbuffer, NULL);
+	//DeviceContext->RSSetViewports(1, &Viewport);
 
 	// Set input layout
-	DeviceContext->IASetInputLayout(FSTriangleIL);
+	//DeviceContext->IASetInputLayout(FSTriangleIL);
 
 	// Set vertex buffers and constant buffers (uniforms)
-	DeviceContext->IASetVertexBuffers(0, 1, &VertexBuffer, &stride, &offset);
-	DeviceContext->VSSetConstantBuffers(0, 1, &VSConstantBuffer);
+	//DeviceContext->IASetVertexBuffers(0, 1, &VertexBuffer, &stride, &offset);
+	//DeviceContext->VSSetConstantBuffers(0, 1, &VSConstantBuffer);
 
 	// Set primitive topology
-	DeviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	//DeviceContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	// Set shaders
-	DeviceContext->VSSetShader(FSTriangleVS, 0, 0);
-	DeviceContext->PSSetShader(FSTrianglePS, 0, 0);
+	//DeviceContext->VSSetShader(FSTriangleVS, 0, 0);
+	//DeviceContext->PSSetShader(FSTrianglePS, 0, 0);
 
-	// Bind offscreen texture
-	DeviceContext->PSSetShaderResources(0, 1, &OffscreenTexSRV);
-	// Bind the sampler
-	DeviceContext->PSSetSamplers(0, 1, &OffscreenPSSampler);
+	//// Bind offscreen texture
+	//DeviceContext->PSSetShaderResources(0, 1, &OffscreenTexSRV);
+	//// Bind the sampler
+	//DeviceContext->PSSetSamplers(0, 1, &OffscreenPSSampler);
 
 	// Invoke the draw
 	DeviceContext->Draw(3, 0);
@@ -314,6 +342,9 @@ void Cef3DDirect3D11Renderer::UpdateOffscreenTexture(const void * buffer, int wi
 	D3D11_MAPPED_SUBRESOURCE mappedData;
 	mappedData.pData = 0;
 
+	if (!OffscreenTex || !DeviceContext)
+		return;
+
 	HRESULT hr = DeviceContext->Map(OffscreenTex, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData);
 
 	if (FAILED(hr) || !mappedData.pData)
@@ -328,7 +359,80 @@ void Cef3DDirect3D11Renderer::UpdateOffscreenTexture(const void * buffer, int wi
 bool Cef3DDirect3D11Renderer::Resize(int width, int height)
 {
 	Window->Resize(width, height);
-	return Init(Window);
+
+	HRESULT hr;
+
+	/********************************************************/
+
+	DeviceContext->OMSetRenderTargets(0, 0, 0);
+
+	Backbuffer->Release();
+
+	// Preserve the existing buffer count and format.
+	// Automatically choose the width and height to match the client rect for HWNDs.
+	hr = SwapChain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
+
+	ID3D11Texture2D* pBuffer;
+	hr = SwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D),
+		(void**)&pBuffer);
+
+	hr = Device->CreateRenderTargetView(pBuffer, NULL, &Backbuffer);
+
+	pBuffer->Release();
+
+	DeviceContext->OMSetRenderTargets(1, &Backbuffer, NULL);
+
+	Viewport.TopLeftX = 0;
+	Viewport.TopLeftY = 0;
+	Viewport.Width = width;
+	Viewport.Height = height;
+
+	DeviceContext->RSSetViewports(1, &Viewport);
+
+	/********************************************************/
+
+	if (OffscreenTex)
+		D3D_SAFE_RELEASE(OffscreenTex);
+	if (OffscreenTexSRV)
+		D3D_SAFE_RELEASE(OffscreenTexSRV);
+
+	// Create offscreen texture
+	D3D11_TEXTURE2D_DESC desc;
+	ZeroMemory(&desc, sizeof(D3D11_TEXTURE2D_DESC));
+
+	desc.Width = Window->GetWidth();
+	desc.Height = Window->GetHeight();
+	desc.MipLevels = desc.ArraySize = 1;
+	desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+	desc.SampleDesc.Count = 1;
+	desc.Usage = D3D11_USAGE_DYNAMIC;
+	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+	desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	desc.MiscFlags = 0;
+
+	hr = Device->CreateTexture2D(&desc, NULL, &OffscreenTex);
+	if (FAILED(hr))
+		return false;
+
+	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+	srvDesc.Format = desc.Format;
+	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MostDetailedMip = 0;
+	srvDesc.Texture2D.MipLevels = 1;
+
+	hr = Device->CreateShaderResourceView(OffscreenTex, &srvDesc, &OffscreenTexSRV);
+
+	if (FAILED(hr))
+		return false;
+
+	// Bind offscreen texture
+	DeviceContext->PSSetShaderResources(0, 1, &OffscreenTexSRV);
+
+	/********************************************************/
+
+	
+
+	return true;
 }
 
 bool Cef3DDirect3D11Renderer::CompileFsTriangleVertexShader(unsigned flags)
